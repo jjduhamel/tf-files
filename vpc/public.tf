@@ -1,18 +1,7 @@
-variable "vpc_id" {}
-variable "availability_zones" { default = [] }
-
-resource "aws_internet_gateway" "public" {
-  vpc_id = "${ var.vpc_id }"
-
-  tags {
-    Name = "Public Gateway"
-  }
-}
-
 resource "aws_subnet" "public" {
-  count = "3"
-  vpc_id = "${ var.vpc_id }"
-  availability_zone = "${ element(var.availability_zones, count.index) }"
+  count = "${ length(data.aws_availability_zones.az.names) }"
+  vpc_id = "${ aws_vpc.vpc.id }"
+  availability_zone = "${ element(data.aws_availability_zones.az.names, count.index) }"
   cidr_block = "${ cidrsubnet("10.0.0.0/16", 8, count.index+10) }"
 
   tags {
@@ -23,11 +12,11 @@ resource "aws_subnet" "public" {
 }
 
 resource "aws_route_table" "public" {
-  vpc_id = "${ var.vpc_id }"
+  vpc_id = "${ aws_vpc.vpc.id }"
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = "${ aws_internet_gateway.public.id }"
+    gateway_id = "${ aws_internet_gateway.public-gateway.id }"
   }
 
   tags {
@@ -36,9 +25,7 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table_association" "public" {
-  count = "3"
+  count = "${ length(aws_subnet.public.*.id) }"
   subnet_id = "${ element(aws_subnet.public.*.id, count.index) }"
   route_table_id = "${ aws_route_table.public.id }"
 }
-
-output "subnet_ids" { value = "${ aws_subnet.public.*.id }" }
