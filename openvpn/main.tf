@@ -21,7 +21,7 @@ data "terraform_remote_state" "vpc" {
   }
 }
 
-data "aws_vpc" "vpc" {
+data "aws_vpc" "primary" {
   id = "${ data.terraform_remote_state.vpc.vpc_id }"
 }
 
@@ -51,10 +51,6 @@ data "terraform_remote_state" "dns" {
   }
 }
 
-data "aws_route53_zone" "public" {
-  zone_id = "${ data.terraform_remote_state.dns.public_zone }"
-}
-
 data "aws_ami" "debian" {
   most_recent = true
 
@@ -64,7 +60,7 @@ data "aws_ami" "debian" {
 
 resource "aws_security_group" "openvpn" {
   name = "openvpn"
-  vpc_id = "${ data.aws_vpc.vpc.id }"
+  vpc_id = "${ data.aws_vpc.primary.id }"
   description = "OpenVPN (UDP)"
   tags { Name = "OpenVPN" }
 
@@ -136,7 +132,7 @@ resource "aws_instance" "openvpn" {
       "credstash -r us-west-2 get VPN_CA_CERT | sudo tee /etc/openvpn/ca.crt > /dev/null",
       "credstash -r us-west-2 get VPN_SERVER_CERT | sudo tee /etc/openvpn/server.crt > /dev/null",
       "credstash -r us-west-2 get VPN_SERVER_KEY | sudo tee /etc/openvpn/server.key > /dev/null",
-			"sudo systemctl daemon-reload",
+      "sudo systemctl daemon-reload",
       "sudo systemctl enable openvpn@local",
       "sudo systemctl start openvpn@local",
       "set +x"
@@ -149,7 +145,7 @@ resource "aws_eip" "openvpn" {
 }
 
 resource "aws_route53_record" "openvpn" {
-  zone_id = "${ data.aws_route53_zone.public.zone_id }"
+  zone_id = "${ data.terraform_remote_state.dns.public_zone }"
   name = "ovpn.homebrewpcb.com"
   type = "A"
   ttl = "300"
@@ -158,5 +154,5 @@ resource "aws_route53_record" "openvpn" {
 
 output "ip_address" { value = "${ aws_eip.openvpn.public_ip }" }
 output "ami_id" { value = "${ data.aws_ami.debian.id }" }
-output "vpc_id" { value = "${ data.aws_vpc.vpc.id }" }
+output "vpc_id" { value = "${ data.aws_vpc.primary.id }" }
 output "subnet_id" { value = "${ data.aws_subnet.public.id }" }

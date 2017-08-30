@@ -12,7 +12,6 @@ terraform {
   }
 }
 
-
 resource "aws_dynamodb_table" "credstash" {
   name = "${ var.dynamo_table }"
   read_capacity = 1
